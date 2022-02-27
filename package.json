@@ -1,18 +1,16 @@
 {
-  "name": "webtorrent-cli",
+  "name": "@f8ith/flix",
   "type": "module",
-  "description": "WebTorrent, the streaming torrent client. For the command line.",
+  "description": "flix, stream any show from your terminal.",
   "version": "4.0.3",
   "author": {
-    "name": "WebTorrent LLC",
-    "email": "feross@webtorrent.io",
-    "url": "https://webtorrent.io"
+    "name": "f8ith"
   },
   "bin": {
-    "webtorrent": "./bin/cmd.js"
+    "flix": "./bin/cmd.js"
   },
   "bugs": {
-    "url": "https://github.com/webtorrent/webtorrent-cli/issues"
+    "url": "https://github.com/f8ith/flix/issues"
   },
   "dependencies": {
     "chalk": "^4.1.1",
@@ -20,6 +18,7 @@
     "create-torrent": "^5.0.0",
     "dlnacasts": "^0.1.0",
     "ecstatic": "^4.1.4",
+    "fluent-ffmpeg": "^2.1.2",
     "memory-chunk-store": "^1.3.5",
     "mime": "^3.0.0",
     "moment": "^2.29.1",
@@ -28,9 +27,9 @@
     "parse-torrent": "^9.1.3",
     "prettier-bytes": "^1.0.4",
     "vlc-command": "^1.2.0",
-    "yargs": "^17.0.1",
     "webtorrent": "^1.3.2",
-    "winreg": "^1.2.4"
+    "winreg": "^1.2.4",
+    "yargs": "^17.0.1"
   },
   "devDependencies": {
     "@webtorrent/semantic-release-config": "1.0.7",
@@ -47,7 +46,7 @@
   "exports": {
     "./bin/cmd.js": "./bin/cmd.js"
   },
-  "homepage": "https://webtorrent.io",
+  "homepage": "https://github.com/f8ith/flix",
   "keywords": [
     "bittorrent",
     "bittorrent client",
@@ -57,7 +56,7 @@
     "torrent",
     "webrtc",
     "webrtc data",
-    "webtorrent"
+    "flix"
   ],
   "license": "MIT",
   "optionalDependencies": {
@@ -68,30 +67,11 @@
   "preferGlobal": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/webtorrent/webtorrent-cli.git"
+    "url": "https://github.com/f8ith/flix.git"
   },
   "scripts": {
     "test": "standard && tape test/*.js",
     "update-authors": "./tools/update-authors.sh"
-  },
-  "funding": [
-    {
-      "type": "github",
-      "url": "https://github.com/sponsors/feross"
-    },
-    {
-      "type": "patreon",
-      "url": "https://www.patreon.com/feross"
-    },
-    {
-      "type": "consulting",
-      "url": "https://feross.org/support"
-    }
-  ],
-  "renovate": {
-    "extends": [
-      "github>webtorrent/renovate-config"
-    ]
   },
   "release": {
     "extends": "@webtorrent/semantic-release-config"

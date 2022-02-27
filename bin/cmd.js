@@ -18,8 +18,9 @@ import WebTorrent from 'webtorrent'
 import Yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import open from 'open'
+import ffmpeg from 'fluent-ffmpeg';
 
-const { version: webTorrentCliVersion } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url)))
+const { version: flixCliVersion } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url)))
 const { version: webTorrentVersion } = JSON.parse(fs.readFileSync(new URL('../node_modules/webtorrent/package.json', import.meta.url)))
 
 const yargs = Yargs()
@@ -37,6 +38,7 @@ const options = {
     iina: { desc: 'IINA', type: 'boolean' },
     smplayer: { desc: 'SMPlayer', type: 'boolean' },
     xbmc: { desc: 'XBMC', type: 'boolean' },
+    mp4: { desc: 'Transcode to mp4', type: 'boolean' },
     stdout: { desc: 'Standard out (implies --quiet)', type: 'boolean' }
   },
   simple: {
@@ -96,15 +98,15 @@ let expectedError = false
 let gracefullyExiting = false
 let torrentCount = 1
 
-process.title = 'WebTorrent'
+process.title = 'Flix'
 
 process.on('exit', code => {
   if (code === 0 || expectedError) return // normal exit
   if (code === 130) return // intentional exit with Control-C
 
-  console.log(chalk`\n{red UNEXPECTED ERROR:} If this is a bug in WebTorrent, report it!`)
-  console.log(chalk`{green OPEN AN ISSUE:} https://github.com/webtorrent/webtorrent-cli/issues\n`)
-  console.log(`DEBUG INFO: webtorrent-cli ${webTorrentCliVersion}, webtorrent ${webTorrentVersion}, node ${process.version}, ${process.platform} ${process.arch}, exit ${code}`)
+  console.log(chalk`\n{red UNEXPECTED ERROR:} If this is a bug in Flix, report it!`)
+  console.log(chalk`{green OPEN AN ISSUE:} https://github.com/f8ith/flix/issues\n`)
+  console.log(`DEBUG INFO: flix ${flixCliVersion}, flix ${webTorrentVersion}, node ${process.version}, ${process.platform} ${process.arch}, exit ${code}`)
 })
 
 process.on('SIGINT', gracefulExit)
@@ -112,7 +114,7 @@ process.on('SIGTERM', gracefulExit)
 
 yargs
   .wrap(Math.min(100, yargs.terminalWidth()))
-  .scriptName('webtorrent')
+  .scriptName('flix')
   .locale('en')
   .fail((msg, err) => { console.log(chalk`\n{red Error:} ${msg || err}`); process.exit(1) })
   .usage(
@@ -123,11 +125,11 @@ yargs
       .concat('\n',
         stripIndent`
           Usage:
-            webtorrent [command] <torrent-id> [options]
+            flix [command] <torrent-id> [options]
     
           Examples:
-            webtorrent download "magnet:..." --vlc
-            webtorrent "magnet:..." --vlc --player-args="--video-on-top --repeat"
+            flix download "magnet:..." --vlc
+            flix "magnet:..." --vlc --player-args="--video-on-top --repeat"
     
           Default output location:
             * when streaming: Temp folder
@@ -152,7 +154,7 @@ yargs.middleware(init)
 yargs
   .strict()
   .help('help', 'Show help information')
-  .version('version', 'Show version information', `${webTorrentCliVersion} (${webTorrentVersion})`)
+  .version('version', 'Show version information', `${flixCliVersion} (${webTorrentVersion})`)
   .alias({ help: 'h', version: 'v' })
   .parse(hideBin(process.argv), { startTime: Date.now() })
 
@@ -260,7 +262,7 @@ function runInfo (torrentId) {
 
 function runCreate (input) {
   if (!argv.createdBy) {
-    argv.createdBy = 'WebTorrent <https://webtorrent.io>'
+    argv.createdBy = 'f8ith <https://github.com/f8ith>'
   }
 
   createTorrent(input, argv, (err, torrent) => {
@@ -379,8 +381,8 @@ async function runDownload (torrentId) {
         i.toString().padEnd(2), file.name, prettierBytes(file.length)
       ))
 
-      console.log('\nTo select a specific file, re-run `webtorrent` with "--select [index]"')
-      console.log('Example: webtorrent download "magnet:..." --select 0')
+      console.log('\nTo select a specific file, re-run `flix` with "--select [index]"')
+      console.log('Example: flix download "magnet:..." --select 0')
 
       return gracefulExit()
     }
@@ -475,7 +477,7 @@ async function runDownload (torrentId) {
       const chromecasts = (await import('chromecasts')).default()
 
       const opts = {
-        title: `WebTorrent - ${torrent.files[index].name}`
+        title: `Flix - ${torrent.files[index].name}`
       }
 
       if (argv.subtitles) {
@@ -513,7 +515,7 @@ async function runDownload (torrentId) {
 
       dlnacasts.on('update', player => {
         const opts = {
-          title: `WebTorrent - ${torrent.files[index].name}`,
+          title: `Flix - ${torrent.files[index].name}`,
           type: mime.getType(torrent.files[index].name)
         }
 
@@ -776,7 +778,7 @@ function gracefulExit () {
 
   gracefullyExiting = true
 
-  console.log(chalk`\n{green webtorrent is exiting...}`)
+  console.log(chalk`\n{green flix is exiting...}`)
 
   process.removeListener('SIGINT', gracefulExit)
   process.removeListener('SIGTERM', gracefulExit)
