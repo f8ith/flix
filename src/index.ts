@@ -393,10 +393,14 @@ async function runDownload(torrentId) {
       return gracefulExit()
     }
 
-    // if no index specified, use largest file
-    const index = (typeof argv.select === 'number')
-      ? argv.select
-      : torrent.files.indexOf(torrent.files.reduce((a, b) => a.length > b.length ? a : b))
+    // if no index specified, print out a table of files and ask the user which file to play
+    let index
+    if (typeof argv.select === 'number') {
+      index = argv.select
+    } else {
+      console.table(torrent.files)
+      ask('Index of torrent to download: ').then(i => index = i)
+    }
 
     if (!torrent.files[index]) {
       return errorAndExit(`There's no file that maps to index ${index}`)
