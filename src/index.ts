@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 import chalk from 'chalk'
 import cp from 'child_process'
 import createTorrent from 'create-torrent'
@@ -19,16 +20,21 @@ import Yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
 import open from 'open'
 import ffmpeg from 'fluent-ffmpeg';
+import shortid from 'shortid';
 
-const { version: flixCliVersion } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url)))
-const { version: webTorrentVersion } = JSON.parse(fs.readFileSync(new URL('../node_modules/webtorrent/package.json', import.meta.url)))
+import { search, getDefaultProviders } from './torrent-search'
+import ask from './ask'
+
+const fileUrl = 'file://' + __filename
+
+const { version: flixCliVersion } = JSON.parse(fs.readFileSync(new URL('../package.json', fileUrl)).toString())
+const { version: webTorrentVersion } = JSON.parse(fs.readFileSync(new URL('../node_modules/webtorrent/package.json', fileUrl)).toString())
 
 const yargs = Yargs()
 
 // Group options into sections (used in yargs configuration)
 const options = {
   streaming: {
-    airplay: { desc: 'Apple TV', type: 'boolean' },
     chromecast: { desc: 'Google Chromecast', defaultDescription: 'all' },
     dlna: { desc: 'DNLA', type: 'boolean' },
     mplayer: { desc: 'MPlayer', type: 'boolean' },
@@ -38,7 +44,7 @@ const options = {
     iina: { desc: 'IINA', type: 'boolean' },
     smplayer: { desc: 'SMPlayer', type: 'boolean' },
     xbmc: { desc: 'XBMC', type: 'boolean' },
-    mp4: { desc: 'Transcode to mp4', type: 'boolean' },
+    webmp4: { desc: 'Transcode to mp4 and serve on the web', type: 'boolean' },
     stdout: { desc: 'Standard out (implies --quiet)', type: 'boolean' }
   },
   simple: {
@@ -118,7 +124,7 @@ yargs
   .locale('en')
   .fail((msg, err) => { console.log(chalk`\n{red Error:} ${msg || err}`); process.exit(1) })
   .usage(
-    fs.readFileSync(new URL('ascii-logo.txt', import.meta.url), 'utf-8')
+    fs.readFileSync(new URL('ascii-logo.txt', fileUrl), 'utf-8')
       .split('\n')
       .map(line => chalk`{bold ${line.substring(0, 20)}}{red ${line.substring(20)}}`)
       .join('\n')
@@ -158,7 +164,7 @@ yargs
   .alias({ help: 'h', version: 'v' })
   .parse(hideBin(process.argv), { startTime: Date.now() })
 
-function init (_argv) {
+function init(_argv) {
   argv = _argv
   if ((argv._.length === 0 && !argv.torrentIds) || argv._[0] === 'version') {
     return
@@ -230,7 +236,7 @@ function init (_argv) {
   }
 }
 
-function runInfo (torrentId) {
+function runInfo(torrentId) {
   let parsedTorrent
 
   try {
@@ -260,7 +266,7 @@ function runInfo (torrentId) {
   }
 }
 
-function runCreate (input) {
+function runCreate(input) {
   if (!argv.createdBy) {
     argv.createdBy = 'f8ith <https://github.com/f8ith>'
   }
@@ -278,12 +284,12 @@ function runCreate (input) {
   })
 }
 
-async function runDownload (torrentId) {
+async function runDownload(torrentId) {
   if (!argv.out && !argv.stdout && !playerName) {
     argv.out = process.cwd()
   }
 
-  client = new WebTorrent({
+  client = new (WebTorrent as any)({
     blocklist: argv.blocklist,
     torrentPort: argv['torrent-port'],
     dhtPort: argv['dht-port'],
@@ -311,7 +317,7 @@ async function runDownload (torrentId) {
     updateMetadata()
     torrent.on('wire', updateMetadata)
 
-    function updateMetadata () {
+    function updateMetadata() {
       console.clear()
       console.log(chalk`{green fetching torrent metadata from} {bold ${torrent.numPeers}} {green peers}`)
     }
@@ -333,7 +339,7 @@ async function runDownload (torrentId) {
       console.log(chalk`\ntorrent downloaded {green successfully} from {bold ${numActiveWires}/${torrent.numPeers}} {green peers} in {bold ${getRuntime()}s}!`)
     }
     if (argv.onDone) {
-      cp.spawn(argv.onDone[0], argv.onDone.slice(1), { shell: true })
+      (cp as any).spawn(argv.onDone[0], argv.onDone.slice(1), { shell: true })
         .on('error', (err) => fatalError(err))
         .stderr.on('data', (err) => fatalError(err))
         .unref()
@@ -364,7 +370,7 @@ async function runDownload (torrentId) {
   server.once('listening', initServer)
   server.once('connection', () => (serving = true))
 
-  function initServer () {
+  function initServer() {
     if (torrent.ready) {
       onReady()
     } else {
@@ -372,7 +378,7 @@ async function runDownload (torrentId) {
     }
   }
 
-  function onReady () {
+  function onReady() {
     if (argv.select && typeof argv.select !== 'number') {
       console.log('Select a file to download:')
 
@@ -399,8 +405,8 @@ async function runDownload (torrentId) {
     onSelection(index)
   }
 
-  async function onSelection (index) {
-    href = (argv.airplay || argv.chromecast || argv.xbmc || argv.dlna)
+  async function onSelection(index) {
+    href = (argv.chromecast || argv.xbmc || argv.dlna)
       ? `http://${networkAddress()}:${server.address().port}`
       : `http://localhost:${server.address().port}`
     let allHrefs = []
@@ -409,7 +415,7 @@ async function runDownload (torrentId) {
       if (typeof argv.select !== 'number') {
         index = 0
       }
-      torrent.files.forEach((file, i) => allHrefs.push(JSON.stringify(`${href}/${i}/${encodeURIComponent(file.name)}`)))
+      torrent.files.forEach((file, i) => (allHrefs as any).push(JSON.stringify(`${href}/${i}/${encodeURIComponent(file.name)}`)))
       // set the first file to the selected index
       allHrefs = allHrefs.slice(index, allHrefs.length).concat(allHrefs.slice(0, index))
     } else {
@@ -422,6 +428,24 @@ async function runDownload (torrentId) {
 
     if (argv.stdout) {
       torrent.files[index].createReadStream().pipe(process.stdout)
+    }
+
+    if (argv.webmp4) {
+      const id = shortid.generate();
+      const stream = fs.createWriteStream(`./${id}.mp4`)
+      console.log(`Writing to ./${id}.mp4)`)
+      const proc = ffmpeg(torrent.files[index].createReadStream())
+        .format('mp4')
+        .addOutputOptions('-movflags +frag_keyframe+empty_moov')
+        .audioCodec('copy')
+        .videoCodec('copy')
+        .on('end', function() {
+          console.log('file has been converted successfully');
+        })
+        .on('error', function(err) {
+          console.log('an error happened: ' + err.message);
+        })
+        .save(`./${id}.mp4`)
     }
 
     if (argv.vlc) {
@@ -444,11 +468,11 @@ async function runDownload (torrentId) {
       argv.playlist ? openPlayer(playerArgs.smplayer.concat(allHrefs)) : openPlayer(playerArgs.smplayer.concat(JSON.stringify(href)))
     }
 
-    function openPlayer (args) {
+    function openPlayer(args) {
       cp.spawn(JSON.stringify(args[0]), args.slice(1), { stdio: 'ignore', shell: true })
         .on('error', (err) => {
           if (err) {
-            const isMpvFalseError = playerName === 'mpv' && err.code === 4
+            const isMpvFalseError = playerName === 'mpv' && (err as any).code === 4
 
             if (!isMpvFalseError) {
               return fatalError(err)
@@ -459,24 +483,16 @@ async function runDownload (torrentId) {
         .unref()
     }
 
-    function playerExit () {
+    function playerExit() {
       if (argv.quit) {
         gracefulExit()
       }
     }
 
-    if (argv.airplay) {
-      const airplay = (await import('airplay-js')).default
-
-      airplay.createBrowser()
-        .on('deviceOn', device => device.play(href, 0, () => { }))
-        .start()
-    }
-
     if (argv.chromecast) {
       const chromecasts = (await import('chromecasts')).default()
 
-      const opts = {
+      const opts: any = {
         title: `Flix - ${torrent.files[index].name}`
       }
 
@@ -491,7 +507,7 @@ async function runDownload (torrentId) {
           // If there are no named chromecasts supplied, play on all devices
           argv.chromecast === true ||
           // If there are named chromecasts, check if this is one of them
-          [].concat(argv.chromecast).find(name => player.name.toLowerCase().includes(name.toLowerCase()))
+          [].concat(argv.chromecast).find((name: any) => player.name.toLowerCase().includes(name.toLowerCase()))
         ) {
           player.play(href, opts)
 
@@ -514,7 +530,7 @@ async function runDownload (torrentId) {
       const dlnacasts = (await import('dlnacasts')).default()
 
       dlnacasts.on('update', player => {
-        const opts = {
+        const opts: any = {
           title: `Flix - ${torrent.files[index].name}`,
           type: mime.getType(torrent.files[index].name)
         }
@@ -530,7 +546,7 @@ async function runDownload (torrentId) {
           play()
         }
 
-        function play () {
+        function play() {
           player.play(href, opts)
         }
       })
@@ -539,12 +555,12 @@ async function runDownload (torrentId) {
   }
 }
 
-function runDownloadMeta (torrentId) {
+function runDownloadMeta(torrentId) {
   if (!argv.out && !argv.stdout) {
     argv.out = process.cwd()
   }
 
-  client = new WebTorrent({
+  client = new (WebTorrent as any)({
     blocklist: argv.blocklist,
     torrentPort: argv['torrent-port'],
     dhtPort: argv['dht-port'],
@@ -558,7 +574,7 @@ function runDownloadMeta (torrentId) {
     announce: argv.announce
   })
 
-  torrent.on('infoHash', function () {
+  torrent.on('infoHash', function(this: any) {
     const torrentFilePath = `${argv.out}/${this.infoHash}.torrent`
 
     if (argv.quiet) {
@@ -568,12 +584,12 @@ function runDownloadMeta (torrentId) {
     updateMetadata()
     torrent.on('wire', updateMetadata)
 
-    function updateMetadata () {
+    function updateMetadata() {
       console.clear()
       console.log(chalk`{green fetching torrent metadata from} {bold ${torrent.numPeers}} {green peers}`)
     }
 
-    torrent.on('metadata', function () {
+    torrent.on('metadata', function(this: any) {
       console.clear()
       torrent.removeListener('wire', updateMetadata)
 
@@ -585,7 +601,7 @@ function runDownloadMeta (torrentId) {
   })
 }
 
-function runSeed (input) {
+function runSeed(input) {
   if (path.extname(input).toLowerCase() === '.torrent' || /^magnet:/.test(input)) {
     // `webtorrent seed` is meant for creating a new torrent based on a file or folder
     // of content, not a torrent id (.torrent or a magnet uri). If this command is used
@@ -594,7 +610,7 @@ function runSeed (input) {
     return
   }
 
-  client = new WebTorrent({
+  client = new (WebTorrent as any)({
     blocklist: argv.blocklist,
     torrentPort: argv['torrent-port'],
     dhtPort: argv['dht-port'],
@@ -615,7 +631,7 @@ function runSeed (input) {
   })
 }
 
-function drawTorrent (torrent) {
+function drawTorrent(torrent) {
   if (!argv.quiet) {
     console.clear()
     drawInterval = setInterval(draw, 1000)
@@ -628,7 +644,7 @@ function drawTorrent (torrent) {
   let blockedPeers = 0
   torrent.on('blockedPeer', () => (blockedPeers += 1))
 
-  function draw () {
+  function draw() {
     const unchoked = torrent.wires
       .filter(wire => !wire.peerChoking)
 
@@ -652,7 +668,7 @@ function drawTorrent (torrent) {
 
     if (seeding) line(chalk`{green Info hash:} ${torrent.infoHash}`)
 
-    const portInfo = []
+    const portInfo: any = []
     if (argv['torrent-port']) portInfo.push(chalk`{green Torrent port:} ${argv['torrent-port']}`)
     if (argv['dht-port']) portInfo.push(chalk`{green DHT port:} ${argv['dht-port']}`)
     if (portInfo.length) line(portInfo.join(' '))
@@ -721,7 +737,7 @@ function drawTorrent (torrent) {
       if (argv.verbose) {
         str += chalk` {grey %s} {grey %s}`
 
-        const tags = []
+        const tags: any = []
 
         if (wire.requests.length > 0) {
           tags.push(`${wire.requests.length} reqs`)
@@ -737,7 +753,7 @@ function drawTorrent (torrent) {
         args.push(tags.join(', ').padEnd(15), reqStats.join(' ').padEnd(10))
       }
 
-      line(...[].concat(str, args))
+      line(...([] as any).concat(str, args))
 
       peerslisted += 1
       return linesRemaining > 4
@@ -749,29 +765,29 @@ function drawTorrent (torrent) {
       line('... and %s more', torrent.numPeers - peerslisted)
     }
 
-    function line (...args) {
+    function line(...args: any) {
       console.log(...args)
       linesRemaining -= 1
     }
   }
 }
 
-function handleWarning (err) {
+function handleWarning(err) {
   console.warn(`Warning: ${err.message || err}`)
 }
 
-function fatalError (err) {
+function fatalError(err) {
   console.log(chalk`{red Error:} ${err.message || err}`)
   process.exit(1)
 }
 
-function errorAndExit (err) {
+function errorAndExit(err) {
   console.log(chalk`{red Error:} ${err.message || err}`)
   expectedError = true
   process.exit(1)
 }
 
-function gracefulExit () {
+function gracefulExit() {
   if (gracefullyExiting) {
     return
   }
@@ -797,6 +813,7 @@ function gracefulExit () {
     cp.spawn(argv.onExit[0], argv.onExit.slice(1), { shell: true })
       .on('error', (err) => fatalError(err))
       .stderr.on('data', (err) => fatalError(err))
+      //@ts-expect-error
       .unref()
   }
 
@@ -812,21 +829,21 @@ function gracefulExit () {
   })
 }
 
-function enableQuiet () {
+function enableQuiet() {
   argv.quiet = argv.q = true
 }
 
-function getRuntime () {
+function getRuntime() {
   return Math.floor((Date.now() - argv.startTime) / 1000)
 }
 
-function processInputs (inputs, fn) {
+function processInputs(inputs, fn) {
   // These arguments do not make sense when downloading multiple torrents, or
   // seeding multiple files/folders.
   if (Array.isArray(inputs) && inputs.length !== 0) {
     if (inputs.length > 1) {
       const invalidArguments = [
-        'airplay', 'chromecast', 'dlna', 'mplayer', 'mpv', 'omx', 'vlc', 'iina', 'xbmc',
+        'chromecast', 'dlna', 'mplayer', 'mpv', 'omx', 'vlc', 'iina', 'xbmc',
         'stdout', 'select', 'subtitles', 'smplayer'
       ]
 
@@ -840,7 +857,24 @@ function processInputs (inputs, fn) {
       torrentCount = inputs.length
       enableQuiet()
     }
-    inputs.forEach(input => fn(input))
+    inputs.forEach(async (input) => {
+      try {
+        const [providerNames, queryString] = input.split(':', 2)
+        const providers = getDefaultProviders(providerNames.split(','))
+        const torrents = await search(providers, queryString, { limit: 40 })
+        if (torrents.errors[0]) {
+          const err = torrents.errors[0]
+          console.log(`Error with provider ${err.provider}: ${err.error}`)
+          throw err
+        }
+        console.table(torrents.items, ['name', 'seeds', 'peers', 'size'])
+        const index = parseInt(await ask('Index of torrent to download: '))
+        if (torrents.items[index])
+          return fn(torrents.items[index]?.magnet)
+        return console.log('Index is out of range!')
+      } catch { }
+      fn(input)
+    })
   } else {
     yargs.showHelp('log')
   }
