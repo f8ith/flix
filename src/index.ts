@@ -378,7 +378,7 @@ async function runDownload(torrentId) {
     }
   }
 
-  function onReady() {
+  async function onReady() {
     if (argv.select && typeof argv.select !== 'number') {
       console.log('Select a file to download:')
 
@@ -398,15 +398,16 @@ async function runDownload(torrentId) {
     if (typeof argv.select === 'number') {
       index = argv.select
     } else {
-      console.table(torrent.files)
-      ask('Index of torrent to download: ').then(i => index = i)
-    }
+      console.table(torrent.files, ['name'])
+      index = await ask('Index of torrent to download: ')
 
+    }
     if (!torrent.files[index]) {
       return errorAndExit(`There's no file that maps to index ${index}`)
     }
 
     onSelection(index)
+
   }
 
   async function onSelection(index) {
